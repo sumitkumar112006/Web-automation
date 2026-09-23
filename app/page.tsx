@@ -33,6 +33,9 @@ export default function Page() {
             >
               Success Toast
             </Button>
+            <Button variant="secondary" asChild>
+              <a href="/test">Go to Protected Test Page (/test)</a>
+            </Button>
           </div>
         </div>
         <div className="font-mono text-xs text-muted-foreground">
