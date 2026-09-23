@@ -1,5 +1,6 @@
 import {
   ClerkProvider,
+  OrganizationSwitcher,
   Show,
   UserButton,
 } from "@clerk/nextjs"
@@ -35,11 +36,22 @@ export default function RootLayout({
       )}
     >
       <body>
-        <ClerkProvider appearance={{ theme: shadcn }}>
+        <ClerkProvider
+          appearance={{ theme: shadcn }}
+          taskUrls={{ "choose-organization": "/choose-organization" }}
+        >
           <ThemeProvider>
             <Show when="signed-in">
               <header className="flex items-center justify-between border-b border-border px-6 py-4">
-                <div className="font-semibold text-lg">Web Automation</div>
+                <div className="flex items-center gap-4">
+                  <div className="font-semibold text-lg">Web Automation</div>
+                  <OrganizationSwitcher
+                    hidePersonal={false}
+                    afterCreateOrganizationUrl="/"
+                    afterSelectOrganizationUrl="/"
+                    afterLeaveOrganizationUrl="/choose-organization"
+                  />
+                </div>
                 <div className="flex items-center gap-3">
                   <UserButton />
                 </div>
