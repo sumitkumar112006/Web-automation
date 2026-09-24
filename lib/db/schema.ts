@@ -1,14 +1,12 @@
 import { pgTable, text, timestamp, uuid, jsonb, integer } from "drizzle-orm/pg-core"
 
 export const workflows = pgTable("workflows", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: text("user_id").notNull(),
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: text("org_id").notNull(),
   name: text("name").notNull(),
-  description: text("description"),
-  definition: jsonb("definition").$type<Record<string, unknown>>().default({}),
-  status: text("status").$type<"draft" | "active" | "archived">().default("draft").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  graph: jsonb("graph"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 })
 
 export const executions = pgTable("executions", {
