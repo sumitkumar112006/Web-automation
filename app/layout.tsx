@@ -1,16 +1,24 @@
-import {
-  ClerkProvider,
-  OrganizationSwitcher,
-  Show,
-  UserButton,
-} from "@clerk/nextjs"
+import type { Metadata, Viewport } from "next"
+import { ClerkProvider } from "@clerk/nextjs"
 import { shadcn } from "@clerk/ui/themes"
 import { Geist, Geist_Mono } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/sonner"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+
+export const metadata: Metadata = {
+  title: "Web Automation",
+  description: "Agentic browser automation platform",
+}
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+}
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" })
 
@@ -41,23 +49,9 @@ export default function RootLayout({
           taskUrls={{ "choose-organization": "/choose-organization" }}
         >
           <ThemeProvider>
-            <Show when="signed-in">
-              <header className="flex items-center justify-between border-b border-border px-6 py-4">
-                <div className="flex items-center gap-4">
-                  <div className="font-semibold text-lg">Web Automation</div>
-                  <OrganizationSwitcher
-                    hidePersonal={false}
-                    afterCreateOrganizationUrl="/"
-                    afterSelectOrganizationUrl="/"
-                    afterLeaveOrganizationUrl="/choose-organization"
-                  />
-                </div>
-                <div className="flex items-center gap-3">
-                  <UserButton />
-                </div>
-              </header>
-            </Show>
-            <main>{children}</main>
+            <TooltipProvider>
+              {children}
+            </TooltipProvider>
             <Toaster />
           </ThemeProvider>
         </ClerkProvider>
@@ -65,3 +59,4 @@ export default function RootLayout({
     </html>
   )
 }
+
