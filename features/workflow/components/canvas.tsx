@@ -15,44 +15,48 @@ import {
   type ColorMode,
   type Connection,
   type Edge,
-  type Node,
+  type NodeTypes,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
 import { useTheme } from "next-themes"
+import { StepNode } from "./step-node"
+import type { StepNodeType } from "@/features/workflow/nodes/node-registry"
 
 interface CanvasProps {
   workflowId: string
 }
 
-const initialNodes: Node[] = [
+const nodeTypes: NodeTypes = {
+  step: StepNode,
+}
+
+const initialNodes: StepNodeType[] = [
   {
     id: "1",
-    type: "input",
-    data: { label: "Trigger: Manual Start" },
-    position: { x: 250, y: 25 },
+    type: "step",
+    data: {
+      type: "start",
+      kind: "trigger",
+      title: "Start",
+      values: {},
+    },
+    position: { x: 250, y: 50 },
   },
   {
     id: "2",
-    data: { label: "Browser Action: Open URL" },
-    position: { x: 250, y: 125 },
-  },
-  {
-    id: "3",
-    data: { label: "Browser Action: Extract Data" },
-    position: { x: 100, y: 225 },
-  },
-  {
-    id: "4",
-    type: "output",
-    data: { label: "Output: Result Log" },
-    position: { x: 400, y: 225 },
+    type: "step",
+    data: {
+      type: "open-url",
+      kind: "action",
+      title: "Open URL",
+      values: { url: "https://youtube.com" },
+    },
+    position: { x: 250, y: 160 },
   },
 ]
 
 const initialEdges: Edge[] = [
   { id: "e1-2", source: "1", target: "2", animated: true },
-  { id: "e2-3", source: "2", target: "3" },
-  { id: "e2-4", source: "2", target: "4" },
 ]
 
 const emptySubscribe = () => () => {}
@@ -81,6 +85,7 @@ export function Canvas({ workflowId }: CanvasProps) {
       <ReactFlow
         nodes={nodes}
         edges={edges}
+        nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}

@@ -38,5 +38,3 @@ next-env.d.ts
 .neon
 .trigger
 workflow-shall.md
-nodes
-step-node.tsx

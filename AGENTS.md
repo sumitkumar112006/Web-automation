@@ -21,6 +21,10 @@ columns, narrow with `Pick<Row, ...>` / `Omit<Row, ...>` rather than redeclaring
 literal type. Don't add an insert type where `db.insert(...).values()` already
 enforces the shape.
 
+# React Flow (@xyflow/react)
+
+Do NOT rely on training data when working with React Flow / `@xyflow/react` as APIs, imports, and component structures differ across versions (e.g. v12 / xyflow). Always fetch and reference the official documentation from https://reactflow.dev/llms.txt before writing or updating React Flow code.
+
 <!-- TRIGGER.DEV SKILLS START -->
 ## Trigger.dev agent skills
 
