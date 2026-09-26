@@ -40,24 +40,11 @@ const initialNodes: StepNodeType[] = [
       title: "Start",
       values: {},
     },
-    position: { x: 250, y: 50 },
-  },
-  {
-    id: "2",
-    type: "step",
-    data: {
-      type: "open-url",
-      kind: "action",
-      title: "Open URL",
-      values: { url: "https://youtube.com" },
-    },
-    position: { x: 250, y: 160 },
+    position: { x: 250, y: 100 },
   },
 ]
 
-const initialEdges: Edge[] = [
-  { id: "e1-2", source: "1", target: "2", animated: true },
-]
+const initialEdges: Edge[] = []
 
 const emptySubscribe = () => () => {}
 
