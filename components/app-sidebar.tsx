@@ -25,7 +25,7 @@ export async function AppSidebar({ ...props }: React.ComponentProps<typeof Sideb
               hidePersonal={false}
               afterCreateOrganizationUrl="/"
               afterSelectOrganizationUrl="/"
-              afterLeaveOrganizationUrl="/choose-organization"
+              afterLeaveOrganizationUrl="/"
               appearance={{
                 elements: {
                   rootBox: "w-full max-w-full overflow-hidden",

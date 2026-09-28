@@ -18,6 +18,7 @@ export default async function WorkflowPage({ params }: PageProps) {
   if (!workflow) notFound()
 
   await liveblocks.getOrCreateRoom(id, {
+    organizationId:orgId,
     defaultAccesses: [],
     groupsAccesses: {
       [orgId]: ["room:write"],

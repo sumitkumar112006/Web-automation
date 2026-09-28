@@ -19,7 +19,7 @@ export default function Page() {
         </EmptyMedia>
         <EmptyTitle className="text-base sm:text-lg font-semibold text-foreground">
           No workflow selected
-        </EmptyTitle>
+        </EmptyTitle> 
         <EmptyDescription className="text-xs sm:text-sm text-muted-foreground text-balance">
           Select a workflow from the sidebar or create a new one to get started.
         </EmptyDescription>

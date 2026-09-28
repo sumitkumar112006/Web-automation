@@ -19,6 +19,7 @@ export async function POST(request: Request) {
     {
       userId,
       groupIds: orgId ? [orgId] : [],
+      organizationId: orgId,
     },
     {
       userInfo: {
