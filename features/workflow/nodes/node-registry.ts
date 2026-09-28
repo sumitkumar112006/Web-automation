@@ -39,7 +39,6 @@ export const nodeRegistry = {
         accent: "bg-emerald-500 text-white",
         fields: [
             { key: "url", label: "URL", placeholder: "https://youtube.com", required:true },
-            {key:"Description", label:"Description",placeholder:"Big text", multiline:true}
         ] 
     },
 } satisfies Record<string, NodeDefinition>

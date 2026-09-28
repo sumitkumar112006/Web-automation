@@ -33,6 +33,7 @@ import {
   type StepNodeKind,
   type StepNodeType,
 } from "@/features/workflow/nodes/node-registry"
+import { deleteWorkflowAction } from "@/features/workflow/actions"
 
 // This file builds up to the RightSidebar component exported at the bottom: a
 // header with workflow actions (delete, run), then two tabs — a Toolbar for
@@ -261,7 +262,9 @@ function Palette() {
 // ---------------------------------------------------------------------------
 
 // The "..." menu for workflow-level actions.
-function ActionsMenu() {
+function ActionsMenu({ workflowId }: { workflowId: string }) {
+  const [isPending, startTransition] = React.useTransition()
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -272,9 +275,22 @@ function ActionsMenu() {
       <DropdownMenuContent align="start" className="min-w-48">
         <DropdownMenuItem
           variant="destructive"
+          disabled={isPending}
           className="text-xs [&_svg:not([class*='size-'])]:size-3.5"
-          onSelect={() => {
-            // TODO: delete the workflow, then navigate away.
+          onSelect={(e) => {
+            // Keep the menu mounted while the delete runs so the disabled state
+            // stays visible. Running inside a transition lets the router handle
+            // the action's redirect home on success.
+            e.preventDefault()
+            startTransition(async () => {
+              const promise = deleteWorkflowAction(workflowId)
+              toast.promise(promise, {
+                loading: "Deleting workflow...",
+                success: "Workflow deleted",
+                error: "Failed to delete workflow",
+              })
+              await promise
+            })
           }}
         >
           <Trash2 />
@@ -305,7 +321,7 @@ function RunButton() {
 // The sidebar itself — header on top, then the Toolbar / Editor tabs.
 // ---------------------------------------------------------------------------
 
-export function RightSidebar() {
+export function RightSidebar({ workflowId }: { workflowId: string }) {
   const [tab, setTab] = useState("toolbar")
 
   // TODO: read the currently selected node from React Flow.
@@ -323,7 +339,7 @@ export function RightSidebar() {
     <div className="flex size-full flex-col bg-background">
       <Tabs value={tab} onValueChange={setTab} className="flex size-full flex-col gap-0">
         <div className="flex items-center justify-between border-b border-border p-2">
-          <ActionsMenu />
+          <ActionsMenu workflowId={workflowId} />
           <RunButton />
         </div>
         <TabsList className="m-2 w-fit bg-background">
