@@ -1,302 +1,291 @@
 "use client"
 
 import * as React from "react"
-import { useRealtimeRun } from "@trigger.dev/react-hooks"
+import { useState } from "react"
+import { MoreHorizontal, Play, Trash2 } from "lucide-react"
+
 import {
-  AlertCircle,
-  Check,
-  CheckCircle2,
-  Clock,
-  Copy,
-  Loader2,
-  Play,
-  Terminal,
-} from "lucide-react"
-import { toast } from "sonner"
-
-import { Badge } from "@/components/ui/badge"
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { runWorkflowAction } from "@/features/workflow/actions"
-import type { helloWorldTask } from "@/src/trigger/example"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { cn } from "@/lib/utils"
 
-export function RightSidebar() {
-  const [isPending, startTransition] = React.useTransition()
-  const [runSession, setRunSession] = React.useState<{
-    runId: string
-    publicAccessToken: string
-  } | null>(null)
-  const [copied, setCopied] = React.useState(false)
+import {
+  nodeRegistry,
+  type NodeDefinition,
+  type NodeField,
+  type NodeType,
+  type StepNodeKind,
+  type StepNodeType,
+} from "@/features/workflow/nodes/node-registry"
 
-  // Realtime subscription to the triggered task run
-  const { run, error: realtimeError } = useRealtimeRun<typeof helloWorldTask>(
-    runSession?.runId ?? "",
-    {
-      accessToken: runSession?.publicAccessToken ?? "",
-      enabled: Boolean(runSession?.runId && runSession?.publicAccessToken),
-      onComplete: (completedRun) => {
-        if (completedRun.status === "COMPLETED") {
-          toast.success("Task completed successfully!")
-        } else if (
-          completedRun.status === "FAILED" ||
-          completedRun.status === "CRASHED" ||
-          completedRun.status === "SYSTEM_FAILURE"
-        ) {
-          toast.error("Task execution failed")
-        }
-      },
-    }
+// This file builds up to the RightSidebar component exported at the bottom: a
+// header with workflow actions (delete, run), then two tabs — a Toolbar for
+// adding nodes and an Editor for tweaking the selected node. Each helper below is
+// defined just above the block that uses it.
+
+// ---------------------------------------------------------------------------
+// Shared pieces — used by both the Toolbar and the Editor.
+// ---------------------------------------------------------------------------
+
+// The accent-colored icon chip, mirroring the node on the canvas.
+function NodeIcon({ type, className }: { type: NodeType; className?: string }) {
+  const def = nodeRegistry[type]
+  const Icon = def.icon
+  return (
+    <span
+      className={cn(
+        "flex size-6 shrink-0 items-center justify-center rounded-md",
+        def.accent,
+        className
+      )}
+    >
+      <Icon className="size-3.5" />
+    </span>
   )
+}
 
-  const handleRun = () => {
-    startTransition(async () => {
-      try {
-        const result = await runWorkflowAction()
-        if (result.success && result.id && result.publicAccessToken) {
-          setRunSession({
-            runId: result.id,
-            publicAccessToken: result.publicAccessToken,
-          })
-          toast.success("Task run dispatched", {
-            description: `Run ID: ${result.id}`,
-          })
-        }
-      } catch (error) {
-        toast.error("Failed to trigger task", {
-          description:
-            error instanceof Error ? error.message : "Something went wrong",
-        })
-      }
-    })
+// A titled, scrollable panel. Each tab renders its content inside one.
+function Section({
+  title,
+  icon,
+  children,
+}: {
+  title: string
+  icon?: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex items-center gap-2 border-y border-border bg-card px-3 py-1.5 text-sm font-semibold">
+        {icon}
+        {title}
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Editor tab — edits the fields of the selected node.
+// ---------------------------------------------------------------------------
+
+// A single editor field for a node property.
+function FieldInput({
+  field,
+  value,
+  onChange,
+}: {
+  field: NodeField
+  value: string
+  onChange: (value: string) => void
+}) {
+  // TODO: support a multiline field variant (textarea).
+  return (
+    <Input
+      id={field.key}
+      value={value}
+      placeholder={field.placeholder}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  )
+}
+
+// The Editor tab: one input per field on the selected node, or an empty state.
+function Inspector({ node }: { node: StepNodeType | undefined }) {
+  if (!node) {
+    return (
+      <Section title="Editor">
+        <p className="p-3 text-sm text-muted-foreground">No node selected</p>
+      </Section>
+    )
   }
 
-  const handleCopyRunId = async () => {
-    if (!runSession?.runId) return
-    await navigator.clipboard.writeText(runSession.runId)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-    toast.success("Run ID copied to clipboard")
-  }
+  const { type, title, values } = node.data
+  const def: NodeDefinition = nodeRegistry[type]
 
-  const isRunning =
-    isPending ||
-    run?.status === "EXECUTING" ||
-    run?.status === "QUEUED" ||
-    run?.status === "DEQUEUED" ||
-    run?.status === "WAITING" ||
-    run?.status === "PENDING_VERSION"
+  return (
+    <Section title={title} icon={<NodeIcon type={type} />}>
+      <div className="flex flex-col gap-3 p-3">
+        {def.fields.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No properties</p>
+        ) : (
+          def.fields.map((field: NodeField) => (
+            <div key={field.key} className="flex flex-col gap-1.5">
+              <Label htmlFor={field.key} className="text-xs">
+                {field.label}
+              </Label>
+              <FieldInput
+                field={field}
+                value={values[field.key] ?? ""}
+                onChange={(value) => {
+                  // TODO: save the edit back onto the selected node.
+                  void value
+                }}
+              />
+            </div>
+          ))
+        )}
+      </div>
+    </Section>
+  )
+}
 
-  const renderStatusBadge = () => {
-    if (!run && !isPending && !runSession) {
-      return (
-        <Badge variant="outline" className="text-muted-foreground">
-          Idle
-        </Badge>
-      )
-    }
+// ---------------------------------------------------------------------------
+// Toolbar tab — adds nodes to the canvas, grouped by kind.
+// ---------------------------------------------------------------------------
 
-    if (isPending && !run) {
-      return (
-        <Badge variant="secondary" className="gap-1 animate-pulse">
-          <Loader2 className="size-3 animate-spin" />
-          Dispatching
-        </Badge>
-      )
-    }
+// The Toolbar's groups, one accordion section per node kind.
+const sections: { kind: StepNodeKind; label: string }[] = [
+  { kind: "trigger", label: "Triggers" },
+  { kind: "action", label: "Actions" },
+]
 
-    switch (run?.status) {
-      case "COMPLETED":
-        return (
-          <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 gap-1">
-            <CheckCircle2 className="size-3" />
-            Completed
-          </Badge>
-        )
-      case "EXECUTING":
-        return (
-          <Badge className="bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/20 gap-1 animate-pulse">
-            <Loader2 className="size-3 animate-spin" />
-            Executing
-          </Badge>
-        )
-      case "QUEUED":
-      case "DEQUEUED":
-      case "WAITING":
-      case "PENDING_VERSION":
-        return (
-          <Badge className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20 gap-1">
-            <Clock className="size-3" />
-            Queued
-          </Badge>
-        )
-      case "FAILED":
-      case "CRASHED":
-      case "SYSTEM_FAILURE":
-      case "TIMED_OUT":
-        return (
-          <Badge variant="destructive" className="gap-1">
-            <AlertCircle className="size-3" />
-            Failed
-          </Badge>
-        )
-      case "CANCELED":
-        return (
-          <Badge variant="outline" className="gap-1 text-muted-foreground">
-            Canceled
-          </Badge>
-        )
-      default:
-        return (
-          <Badge variant="secondary" className="gap-1">
-            {run?.status ?? "Running"}
-          </Badge>
-        )
-    }
+// Every node type from the registry, filtered into the groups below.
+const definitions: NodeDefinition[] = Object.values(nodeRegistry)
+
+// The Toolbar tab: a button per node type that adds it to the canvas.
+function Palette() {
+  const add = (type: NodeType) => {
+    // TODO: add the clicked node to the canvas (one trigger max).
+    void type
   }
 
   return (
-    <div className="flex size-full flex-col bg-background/95 divide-y divide-border/60">
-      {/* Header & Action Button */}
-      <div className="p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Terminal className="size-4 text-muted-foreground" />
-            <h3 className="text-sm font-semibold tracking-tight">
-              Task Inspector
-            </h3>
-          </div>
-          {renderStatusBadge()}
-        </div>
+    <Section title="Toolbar">
+      <Accordion
+        type="multiple"
+        defaultValue={sections.map((s) => s.kind)}
+        className="px-3 py-2"
+      >
+        {sections.map((section) => (
+          <AccordionItem
+            key={section.kind}
+            value={section.kind}
+            className="not-last:border-b-0"
+          >
+            <AccordionTrigger className="py-2 text-xs font-medium text-muted-foreground hover:no-underline">
+              {section.label}
+            </AccordionTrigger>
+            <AccordionContent className="flex flex-col gap-0.5">
+              {definitions
+                .filter((def) => def.kind === section.kind)
+                .map((def) => (
+                  <Button
+                    key={def.type}
+                    variant="ghost"
+                    onClick={() => add(def.type as NodeType)}
+                    className="justify-start gap-2.5 px-1.5 text-xs"
+                  >
+                    <NodeIcon type={def.type as NodeType} />
+                    {def.label}
+                  </Button>
+                ))}
+            </AccordionContent>
+          </AccordionItem>
+        ))}
+      </Accordion>
+    </Section>
+  )
+}
 
-        <Button
-          onClick={handleRun}
-          disabled={isRunning}
-          className="w-full gap-2 shadow-xs cursor-pointer font-medium"
-        >
-          {isRunning ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <Play className="size-4 fill-current" />
-          )}
-          {isRunning ? "Running Task..." : "Run Workflow Task"}
+// ---------------------------------------------------------------------------
+// Header — workflow-level actions shown above the tabs.
+// ---------------------------------------------------------------------------
+
+// The "..." menu for workflow-level actions.
+function ActionsMenu() {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="icon" variant="ghost">
+          <MoreHorizontal />
         </Button>
-      </div>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-48">
+        <DropdownMenuItem
+          variant="destructive"
+          className="text-xs [&_svg:not([class*='size-'])]:size-3.5"
+          onSelect={() => {
+            // TODO: delete the workflow, then navigate away.
+          }}
+        >
+          <Trash2 />
+          Delete workflow
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
 
-      {/* Realtime Feedback Section */}
-      <ScrollArea className="flex-1 p-4">
-        {runSession ? (
-          <div className="space-y-4">
-            {/* Run Info Card */}
-            <Card className="border-border/60 bg-muted/20">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Active Run
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-xs">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-muted-foreground">Run ID:</span>
-                  <div className="flex items-center gap-1.5 font-mono text-[11px] bg-background px-2 py-0.5 rounded border border-border/80">
-                    <span className="truncate max-w-[140px]">
-                      {runSession.runId}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleCopyRunId}
-                      className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                      title="Copy Run ID"
-                    >
-                      {copied ? (
-                        <Check className="size-3 text-emerald-500" />
-                      ) : (
-                        <Copy className="size-3" />
-                      )}
-                    </button>
-                  </div>
-                </div>
+// Kicks off a run of the current workflow.
+function RunButton() {
+  return (
+    <Button
+      size="sm"
+      variant="secondary"
+      onClick={() => {
+        // TODO: validate the graph and run the workflow (toggle to Stop while running).
+      }}
+    >
+      <Play className="size-3.5 fill-primary" />
+      Run
+    </Button>
+  )
+}
 
-                {run?.startedAt && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Started:</span>
-                    <span className="font-mono text-foreground/90">
-                      {new Date(run.startedAt).toLocaleTimeString()}
-                    </span>
-                  </div>
-                )}
+// ---------------------------------------------------------------------------
+// The sidebar itself — header on top, then the Toolbar / Editor tabs.
+// ---------------------------------------------------------------------------
 
-                {run?.finishedAt && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Finished:</span>
-                    <span className="font-mono text-foreground/90">
-                      {new Date(run.finishedAt).toLocaleTimeString()}
-                    </span>
-                  </div>
-                )}
+export function RightSidebar() {
+  const [tab, setTab] = useState("toolbar")
 
-                {run?.durationMs !== undefined && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Duration:</span>
-                    <span className="font-mono text-foreground/90">
-                      {run.durationMs} ms
-                    </span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+  // TODO: read the currently selected node from React Flow.
+  const selected: StepNodeType | undefined = undefined
 
-            {/* Task Output / Realtime Result */}
-            {run?.output && (
-              <Card className="border-emerald-500/30 bg-emerald-500/5">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-                    <CheckCircle2 className="size-3.5" />
-                    Task Output
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <pre className="p-2.5 rounded-lg bg-background/80 border border-border/60 text-xs font-mono text-foreground/90 overflow-x-auto whitespace-pre-wrap">
-                    {JSON.stringify(run.output, null, 2)}
-                  </pre>
-                </CardContent>
-              </Card>
-            )}
+  // TODO: auto-switch to the Editor tab when the selection changes.
 
-            {/* Error Feedback */}
-            {(run?.error || realtimeError) && (
-              <Card className="border-destructive/30 bg-destructive/5">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs font-semibold text-destructive flex items-center gap-1.5">
-                    <AlertCircle className="size-3.5" />
-                    Execution Error
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-xs font-mono text-destructive">
-                    {realtimeError?.message ||
-                      (typeof run?.error === "string"
-                        ? run.error
-                        : JSON.stringify(run?.error, null, 2))}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground space-y-2">
-            <div className="size-10 rounded-full bg-muted/40 flex items-center justify-center border border-border/40">
-              <Play className="size-4 text-muted-foreground/60 ml-0.5" />
-            </div>
-            <p className="text-xs font-medium text-foreground/80">
-              Ready to Run
-            </p>
-            <p className="text-[11px] text-muted-foreground max-w-[180px]">
-              Click &quot;Run Workflow Task&quot; to trigger the background task
-              and stream realtime feedback.
-            </p>
-          </div>
-        )}
-      </ScrollArea>
+  return (
+    <div className="flex size-full flex-col bg-background">
+      <Tabs value={tab} onValueChange={setTab} className="flex size-full flex-col gap-0">
+        <div className="flex items-center justify-between border-b border-border p-2">
+          <ActionsMenu />
+          <RunButton />
+        </div>
+        <TabsList className="m-2 w-fit bg-background">
+          <TabsTrigger
+            value="toolbar"
+            className="flex-none rounded-sm data-active:bg-accent! data-active:text-accent-foreground! data-active:shadow-none! dark:data-active:border-transparent!"
+          >
+            Toolbar
+          </TabsTrigger>
+          <TabsTrigger
+            value="editor"
+            className="flex-none rounded-sm data-active:bg-accent! data-active:text-accent-foreground! data-active:shadow-none! dark:data-active:border-transparent!"
+          >
+            Editor
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="toolbar" className="flex min-h-0 flex-1 flex-col mt-0 data-[state=inactive]:hidden">
+          <Palette />
+        </TabsContent>
+        <TabsContent value="editor" className="flex min-h-0 flex-1 flex-col mt-0 data-[state=inactive]:hidden">
+          <Inspector node={selected} />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
