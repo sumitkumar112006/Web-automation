@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useState } from "react"
+import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { useReactFlow, useStore } from "@xyflow/react"
 import { Loader2, MoreHorizontal, Play, Trash2 } from "lucide-react"
@@ -34,7 +34,8 @@ import {
   type StepNodeKind,
   type StepNodeType,
 } from "@/features/workflow/nodes/node-registry"
-import { deleteWorkflowAction } from "@/features/workflow/actions"
+import { deleteWorkflowAction, runWorkflowAction } from "@/features/workflow/actions"
+import { validateGraph } from "../lib/validate-graph"
 
 // This file builds up to the RightSidebar component exported at the bottom: a
 // header with workflow actions (delete, run), then two tabs — a Toolbar for
@@ -329,16 +330,41 @@ function ActionsMenu({ workflowId }: { workflowId: string }) {
 }
 
 // Kicks off a run of the current workflow.
-function RunButton() {
+function RunButton({ workflowId }: { workflowId: string }) {
+  const { getNodes, getEdges } = useReactFlow<StepNodeType>()
+  const [isPending, startTransition] = useTransition()
+
   return (
     <Button
       size="sm"
       variant="secondary"
+      disabled={isPending}
       onClick={() => {
-        // TODO: validate the graph and run the workflow (toggle to Stop while running).
+        const graph = { nodes: getNodes(), edges: getEdges() }
+        const problems = validateGraph(graph)
+        if (problems.length > 0) {
+          toast.error(problems[0])
+          return
+        }
+
+        startTransition(async () => {
+          try {
+            await runWorkflowAction({
+              id: workflowId,
+              graph,
+            })
+            toast.success("Workflow run started")
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Failed to run workflow")
+          }
+        })
       }}
     >
-      <Play className="size-3.5 fill-primary" />
+      {isPending ? (
+        <Loader2 className="size-3.5 animate-spin" />
+      ) : (
+        <Play className="size-3.5 fill-primary" />
+      )}
       Run
     </Button>
   )
@@ -367,7 +393,7 @@ export function RightSidebar({ workflowId }: { workflowId: string }) {
       <Tabs value={tab} onValueChange={setTab} className="flex size-full flex-col gap-0">
         <div className="flex items-center justify-between border-b border-border p-2">
           <ActionsMenu workflowId={workflowId} />
-          <RunButton />
+          <RunButton workflowId={workflowId} />
         </div>
         <TabsList className="m-2 w-fit bg-background">
           <TabsTrigger
