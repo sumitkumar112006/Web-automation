@@ -16,6 +16,7 @@ import {
 import "@xyflow/react/dist/style.css"
 import "@liveblocks/react-ui/styles.css"
 import "@liveblocks/react-flow/styles.css"
+import { AvatarStack } from "@liveblocks/react-ui"
 import { useLiveblocksFlow, Cursors } from "@liveblocks/react-flow"
 import { useTheme } from "next-themes"
 import { StepNode } from "./step-node"
@@ -104,17 +105,13 @@ export function Canvas({ workflowId }: CanvasProps) {
       >
         <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
         <MiniMap />
-        <Panel
-          position="top-right"
-          className="rounded-md border border-border/80 bg-background/80 px-3 py-1.5 text-xs text-muted-foreground shadow-xs backdrop-blur-xs"
-        >
-          Workflow:{" "}
-          <span className="font-mono font-medium text-foreground">
-            {workflowId}
-          </span>
-        </Panel>
         <Controls />
         <Cursors />
+        <Panel
+          position="top-right"
+        >
+          <AvatarStack />
+        </Panel>
       </ReactFlow>
     </div>
   )
