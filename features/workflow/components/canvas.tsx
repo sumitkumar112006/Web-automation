@@ -8,16 +8,15 @@ import {
   BackgroundVariant,
   MiniMap,
   Panel,
-  addEdge,
-  useNodesState,
-  useEdgesState,
   ConnectionLineType,
   type ColorMode,
-  type Connection,
   type Edge,
   type NodeTypes,
 } from "@xyflow/react"
 import "@xyflow/react/dist/style.css"
+import "@liveblocks/react-ui/styles.css"
+import "@liveblocks/react-flow/styles.css"
+import { useLiveblocksFlow, Cursors } from "@liveblocks/react-flow"
 import { useTheme } from "next-themes"
 import { StepNode } from "./step-node"
 import type { StepNodeType } from "@/features/workflow/nodes/node-registry"
@@ -46,7 +45,7 @@ const initialNodes: StepNodeType[] = [
 
 const initialEdges: Edge[] = []
 
-const emptySubscribe = () => () => {}
+const emptySubscribe = () => () => { }
 
 export function Canvas({ workflowId }: CanvasProps) {
   const { resolvedTheme } = useTheme()
@@ -56,13 +55,22 @@ export function Canvas({ workflowId }: CanvasProps) {
     () => false
   )
 
-  const [nodes, , onNodesChange] = useNodesState(initialNodes)
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
-
-  const onConnect = React.useCallback(
-    (params: Connection) => setEdges((eds) => addEdge(params, eds)),
-    [setEdges]
-  )
+  const {
+    nodes,
+    edges,
+    onNodesChange,
+    onEdgesChange,
+    onConnect,
+    onDelete,
+  } = useLiveblocksFlow<StepNodeType, Edge>({
+    suspense: true,
+    nodes: {
+      initial: initialNodes,
+    },
+    edges: {
+      initial: initialEdges,
+    },
+  })
 
   const colorMode: ColorMode =
     mounted && resolvedTheme ? (resolvedTheme as ColorMode) : "light"
@@ -76,6 +84,7 @@ export function Canvas({ workflowId }: CanvasProps) {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onDelete={onDelete}
         colorMode={colorMode}
         connectionLineType={ConnectionLineType.SmoothStep}
         connectionLineStyle={{ stroke: "var(--border)" }}
@@ -90,12 +99,10 @@ export function Canvas({ workflowId }: CanvasProps) {
             "--xy-connectionline-stroke-width": 2,
           } as React.CSSProperties
         }
-
         maxZoom={1}
         fitView
       >
         <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
-        <Controls />
         <MiniMap />
         <Panel
           position="top-right"
@@ -106,6 +113,8 @@ export function Canvas({ workflowId }: CanvasProps) {
             {workflowId}
           </span>
         </Panel>
+        <Controls />
+        <Cursors />
       </ReactFlow>
     </div>
   )
