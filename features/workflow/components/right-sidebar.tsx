@@ -22,6 +22,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 
 import {
@@ -85,7 +86,7 @@ function Section({
 // ---------------------------------------------------------------------------
 
 // A single editor field for a node property.
-function FieldInput({
+function Field({
   field,
   value,
   onChange,
@@ -94,20 +95,27 @@ function FieldInput({
   value: string
   onChange: (value: string) => void
 }) {
-  // TODO: support a multiline field variant (textarea).
+  const Component = field.multiline ? Textarea : Input
+
   return (
-    <Input
-      id={field.key}
-      value={value}
-      placeholder={field.placeholder}
-      onChange={(e) => onChange(e.target.value)}
-    />
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={field.key} className="text-xs">
+        {field.label}
+        {field.required && <span className="text-destructive">*</span>}
+      </Label>
+      <Component
+        id={field.key}
+        value={value}
+        placeholder={field.placeholder}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
   )
 }
 
 // The Editor tab: one input per field on the selected node, or an empty state.
 function Inspector({ node }: { node: StepNodeType | undefined }) {
-  const {updateNodeData} = useReactFlow<StepNodeType>()
+  const { updateNodeData } = useReactFlow<StepNodeType>()
   if (!node) {
     return (
       <Section title="Editor">
@@ -126,20 +134,16 @@ function Inspector({ node }: { node: StepNodeType | undefined }) {
           <p className="text-xs text-muted-foreground">No properties</p>
         ) : (
           def.fields.map((field: NodeField) => (
-            <div key={field.key} className="flex flex-col gap-1.5">
-              <Label htmlFor={field.key} className="text-xs">
-                {field.label}
-              </Label>
-              <FieldInput
-                field={field}
-                value={values[field.key] ?? ""}
-                onChange={(value) => {
-                  updateNodeData(node.id, {
-                     values: {...values, [field.key]: value},
-                   })
-                }}
-              />
-            </div>
+            <Field
+              key={field.key}
+              field={field}
+              value={values[field.key] ?? ""}
+              onChange={(value) => {
+                updateNodeData(node.id, {
+                  values: { ...values, [field.key]: value },
+                })
+              }}
+            />
           ))
         )}
       </div>
@@ -308,6 +312,12 @@ export function RightSidebar() {
   const selected = useStore((state) => state.nodes.find(n => n.selected)) as StepNodeType || undefined
 
   // TODO: auto-switch to the Editor tab when the selection changes.
+  const [prevSelectId, setPrevSelectId] = useState(selected?.id)
+
+  if(selected && selected.id != prevSelectId){
+    setPrevSelectId(selected.id)
+    setTab("editor")
+  }
 
   return (
     <div className="flex size-full flex-col bg-background">
