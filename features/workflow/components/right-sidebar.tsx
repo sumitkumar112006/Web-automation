@@ -2,8 +2,9 @@
 
 import * as React from "react"
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { useReactFlow, useStore } from "@xyflow/react"
-import { MoreHorizontal, Play, Trash2 } from "lucide-react"
+import { Loader2, MoreHorizontal, Play, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -263,38 +264,64 @@ function Palette() {
 
 // The "..." menu for workflow-level actions.
 function ActionsMenu({ workflowId }: { workflowId: string }) {
-  const [isPending, startTransition] = React.useTransition()
+  const router = useRouter()
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [open, setOpen] = useState(false)
+
+  const handleDelete = async () => {
+    setIsDeleting(true)
+    const toastId = toast.loading("Deleting workflow...")
+
+    try {
+      const res = await deleteWorkflowAction(workflowId)
+      if (res?.success) {
+        toast.success("Workflow deleted successfully", { id: toastId })
+        setOpen(false)
+        router.push("/")
+        router.refresh()
+      } else {
+        throw new Error("Failed to delete workflow")
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete workflow", {
+        id: toastId,
+      })
+      setIsDeleting(false)
+    }
+  }
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={(val) => !isDeleting && setOpen(val)}>
       <DropdownMenuTrigger asChild>
-        <Button size="icon" variant="ghost">
-          <MoreHorizontal />
+        <Button size="icon" variant="ghost" disabled={isDeleting} aria-label="Workflow options">
+          {isDeleting ? (
+            <Loader2 className="size-4 animate-spin text-destructive" />
+          ) : (
+            <MoreHorizontal className="size-4" />
+          )}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-48">
         <DropdownMenuItem
           variant="destructive"
-          disabled={isPending}
-          className="text-xs [&_svg:not([class*='size-'])]:size-3.5"
+          disabled={isDeleting}
+          className="text-xs [&_svg:not([class*='size-'])]:size-3.5 cursor-pointer flex items-center gap-2"
           onSelect={(e) => {
-            // Keep the menu mounted while the delete runs so the disabled state
-            // stays visible. Running inside a transition lets the router handle
-            // the action's redirect home on success.
             e.preventDefault()
-            startTransition(async () => {
-              const promise = deleteWorkflowAction(workflowId)
-              toast.promise(promise, {
-                loading: "Deleting workflow...",
-                success: "Workflow deleted",
-                error: "Failed to delete workflow",
-              })
-              await promise
-            })
+            handleDelete()
           }}
         >
-          <Trash2 />
-          Delete workflow
+          {isDeleting ? (
+            <>
+              <Loader2 className="size-3.5 animate-spin" />
+              <span>Deleting workflow...</span>
+            </>
+          ) : (
+            <>
+              <Trash2 className="size-3.5" />
+              <span>Delete workflow</span>
+            </>
+          )}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
