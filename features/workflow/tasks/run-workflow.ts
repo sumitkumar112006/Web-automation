@@ -1,11 +1,16 @@
 import path from "node:path"
 import fs from "node:fs"
 import toposort from "toposort"
-import { logger, task } from "@trigger.dev/sdk"
+import { logger, metadata, task } from "@trigger.dev/sdk"
 import { getWorkflow } from "@/features/workflow/data"
 import { browserbase, Stagehand } from "@browserbasehq/stagehand"
 import { nodeExecutors } from "@/features/workflow/nodes/node-executors"
 import { interpolate } from "@/features/workflow/lib"
+
+export type RunStep = {
+  id: string
+  status: "pending" | "running" | "done" | "failed"
+}
 
 // Ensure Stagehand finds the extension assets even when bundled by Trigger.dev
 const defaultExtensionZip = path.resolve(
@@ -101,9 +106,19 @@ export const runWorkflowTask = task({
 
     const outputs: Record<string, unknown> = {}
 
+    // Initialize and publish initial step list under metadata "steps"
+    const steps: RunStep[] = order.map((id) => ({ id, status: "pending" }))
+    metadata.set("steps", steps)
+
     try {
       for (const id of order) {
         const node = byId.get(id)!
+        const step = steps.find((s) => s.id === id)!
+
+        step.status = "running"
+        metadata.set("steps", steps)
+        await metadata.flush()
+
         logger.log(`Running step: ${node.data.title}`)
 
         const values = Object.fromEntries(
@@ -113,15 +128,22 @@ export const runWorkflowTask = task({
           ])
         )
 
-        // TODO: actually execute the node instead of just logging it, and report
-        // its progress so the UI can watch the run live.
-        const executor = nodeExecutors[node.data.type]
-        if (executor) {
-          const result = await executor({
-            values,
-            getStagehand,
-          })
-          outputs[id] = result
+        try {
+          const executor = nodeExecutors[node.data.type]
+          if (executor) {
+            const result = await executor({
+              values,
+              getStagehand,
+            })
+            outputs[id] = result
+          }
+          step.status = "done"
+          metadata.set("steps", steps)
+        } catch (err) {
+          step.status = "failed"
+          metadata.set("steps", steps)
+          await metadata.flush()
+          throw err
         }
       }
     } finally {
@@ -129,6 +151,6 @@ export const runWorkflowTask = task({
       await browser?.close()
     }
 
-    return { steps: order.length }
+    return { steps }
   },
 })

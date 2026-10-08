@@ -1,9 +1,11 @@
 import { auth } from "@clerk/nextjs/server"
 import { notFound } from "next/navigation"
 import { ReactFlowProvider } from "@xyflow/react"
+import { auth as triggerAuth } from "@trigger.dev/sdk"
 import { getWorkflow } from "@/features/workflow/data"
 import { Room } from "@/features/workflow/components/room"
 import { WorkflowShell } from "@/features/workflow/components/workflow-shell"
+import { WorkflowRunsProvider } from "@/features/workflow/components/workflow-runs-provider"
 import { liveblocks } from "@/lib/liveblocks"
 
 interface PageProps {
@@ -26,11 +28,23 @@ export default async function WorkflowPage({ params }: PageProps) {
     },
   })
 
+  const accessToken = await triggerAuth.createPublicToken({
+    scopes: {
+      read: {
+        tags: [`workflow:${id}`],
+      },
+    },
+    expirationTime: "1h",
+  })
+
   return (
     <Room roomId={id}>
       <ReactFlowProvider>
-        <WorkflowShell workflowId={id} />
+        <WorkflowRunsProvider workflowId={id} accessToken={accessToken}>
+          <WorkflowShell workflowId={id} />
+        </WorkflowRunsProvider>
       </ReactFlowProvider>
     </Room>
   )
 }
+

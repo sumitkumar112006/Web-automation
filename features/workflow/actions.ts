@@ -61,10 +61,16 @@ export async function runWorkflowAction({
   }
   await saveWorkflowGraph({orgId,id,graph})
 
-  const handle = await tasks.trigger<typeof runWorkflowTask>("run-workflow", {
-    workflowId: id,
-    orgId,
-  })
+  const handle = await tasks.trigger<typeof runWorkflowTask>(
+    "run-workflow",
+    {
+      workflowId: id,
+      orgId,
+    },
+    {
+      tags: [`workflow:${id}`],
+    }
+  )
 
   return { id: handle.id }
 }

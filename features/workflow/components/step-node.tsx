@@ -1,17 +1,24 @@
 import { memo } from "react"
 import { Handle, Position, type NodeProps } from "@xyflow/react"
+import { Loader2 } from "lucide-react"
 
 import {
     nodeRegistry,
     type StepNodeType,
 } from "../nodes/node-registry"
+import { useLatestRunSteps } from "./workflow-runs-provider"
 import { cn } from "@/lib/utils"
 
-function StepNodeComponent({ data, selected }: NodeProps<StepNodeType>) {
+function StepNodeComponent({ id, data, selected }: NodeProps<StepNodeType>) {
     const { type, kind, title, values } = data
     const def = nodeRegistry[type]
     const Icon = def.icon
     const fields = def.fields.filter((field) => values[field.key])
+
+    const { steps, isLive } = useLatestRunSteps()
+    const step = steps.find((s) => s.id === id)
+    const isRunning = isLive && step?.status === "running"
+    const isFailed = step?.status === "failed"
 
     // A trigger starts the flow and takes no input, so it has no target handle.
     const hasTarget = kind !== "trigger"
@@ -19,7 +26,9 @@ function StepNodeComponent({ data, selected }: NodeProps<StepNodeType>) {
     return (
         <div
             className={cn(
-                "min-w-50 max-w-80 rounded-(--radius) border-2 border-border bg-card text-card-foreground",
+                "min-w-50 max-w-80 rounded-(--radius) border-2 border-border bg-card text-card-foreground transition-colors",
+                isRunning && "border-blue-500",
+                isFailed && "border-destructive",
                 selected && "ring-2 ring-ring ring-offset-2 ring-offset-background"
             )}
         >
@@ -36,10 +45,14 @@ function StepNodeComponent({ data, selected }: NodeProps<StepNodeType>) {
                 <div
                     className={cn(
                         "flex size-7 shrink-0 items-center justify-center rounded-md",
-                        def.accent
+                        isRunning ? "bg-blue-500 text-white" : def.accent
                     )}
                 >
-                    <Icon className="size-4" />
+                    {isRunning ? (
+                        <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                        <Icon className="size-4" />
+                    )}
                 </div>
                 <span className="text-sm font-semibold">{title}</span>
             </div>
