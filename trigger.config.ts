@@ -1,4 +1,5 @@
 import { defineConfig } from "@trigger.dev/sdk"
+import { additionalFiles } from "@trigger.dev/build/extensions/core"
 
 export default defineConfig({
   project: "proj_bdyeeuxdresnszikvadu",
@@ -16,4 +17,16 @@ export default defineConfig({
     },
   },
   dirs: ["features/workflow/tasks"],
+  build: {
+    extensions: [
+      additionalFiles({
+        files: [
+          "features/workflow/dist/**",
+          "node_modules/@browserbasehq/stagehand/dist/assets/**",
+          "node_modules/@browserbasehq/stagehand/dist/extension/**",
+        ],
+      }),
+    ],
+  },
 })
+

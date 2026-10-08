@@ -1,6 +1,27 @@
+import path from "node:path"
+import fs from "node:fs"
 import toposort from "toposort"
 import { logger, task } from "@trigger.dev/sdk"
 import { getWorkflow } from "@/features/workflow/data"
+import { browserbase, Stagehand } from "@browserbasehq/stagehand"
+import { nodeExecutors } from "@/features/workflow/nodes/node-executors"
+
+// Ensure Stagehand finds the extension assets even when bundled by Trigger.dev
+const defaultExtensionZip = path.resolve(
+  process.cwd(),
+  "node_modules/@browserbasehq/stagehand/dist/assets/stagehand-extension.zip"
+)
+if (!process.env.STAGEHAND_EXTENSION_ARCHIVE_PATH && fs.existsSync(defaultExtensionZip)) {
+  process.env.STAGEHAND_EXTENSION_ARCHIVE_PATH = defaultExtensionZip
+}
+
+const defaultExtensionDir = path.resolve(
+  process.cwd(),
+  "node_modules/@browserbasehq/stagehand/dist/extension"
+)
+if (!process.env.STAGEHAND_EXTENSION_DIRECTORY_PATH && fs.existsSync(defaultExtensionDir)) {
+  process.env.STAGEHAND_EXTENSION_DIRECTORY_PATH = defaultExtensionDir
+}
 
 export const runWorkflowTask = task({
   id: "run-workflow",
@@ -25,11 +46,75 @@ export const runWorkflowTask = task({
 
     logger.log(`Running workflow ${workflow.name}`, { steps: order.length })
 
-    for (const id of order) {
-      const node = byId.get(id)!
-      logger.log(`Running step: ${node.data.title}`)
-      // TODO: actually execute the node instead of just logging it, and report
-      // its progress so the UI can watch the run live.
+    // The run owns one Browserbase session, opened lazily on the first browser step
+    // and reused by every later one, so the recording spans the whole flow. The
+    // LLM routes through Browserbase's Model Gateway (BROWSERBASE_API_KEY), so no
+    // separate provider key is needed.
+    let stagehand: Stagehand | undefined
+    let browser: Awaited<ReturnType<typeof browserbase.launch>> | undefined
+
+    const getStagehand = async () => {
+      if (!stagehand) {
+        const apiKey = process.env.BROWSERBASE_API_KEY
+        if (!apiKey) {
+          throw new Error("BROWSERBASE_API_KEY is not set in environment variables")
+        }
+
+        const groqApiKey = process.env.GROQ_API_KEY
+        const openaiApiKey = process.env.OPENAI_API_KEY
+
+        const modelConfig = groqApiKey
+          ? {
+              modelName: "groq/llama-3.3-70b-versatile" as const,
+              apiKey: groqApiKey,
+            }
+          : openaiApiKey
+          ? {
+              modelName: "openai/gpt-4.1" as const,
+              apiKey: openaiApiKey,
+            }
+          : null
+
+        if (!modelConfig) {
+          throw new Error(
+            "GROQ_API_KEY is not set in environment variables (.env.local)"
+          )
+        }
+
+        if (!process.env.STAGEHAND_EXTENSION_ARCHIVE_PATH && fs.existsSync(defaultExtensionZip)) {
+          process.env.STAGEHAND_EXTENSION_ARCHIVE_PATH = defaultExtensionZip
+        }
+
+        browser = await browserbase.launch({ apiKey })
+        stagehand = await Stagehand.create({
+          browser,
+          model: modelConfig,
+          // Pino's logging backend spawns a thread-stream worker (lib/worker.js)
+          // that can't be resolved inside trigger.dev's bundled output. Disable it -
+          // the option exists for exactly these minimal/bundled environments.
+          logging: { level: "info", format: "pretty" },
+        })
+      }
+      return stagehand
+    }
+
+    try {
+      for (const id of order) {
+        const node = byId.get(id)!
+        logger.log(`Running step: ${node.data.title}`)
+        // TODO: actually execute the node instead of just logging it, and report
+        // its progress so the UI can watch the run live.
+        const executor = nodeExecutors[node.data.type]
+        if (executor) {
+          await executor({
+            values: node.data.values,
+            getStagehand,
+          })
+        }
+      }
+    } finally {
+      await stagehand?.close()
+      await browser?.close()
     }
 
     return { steps: order.length }

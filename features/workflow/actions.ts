@@ -66,7 +66,7 @@ export async function runWorkflowAction({
     orgId,
   })
 
-  return handle
+  return { id: handle.id }
 }
 
 export async function cancelWorkflowRunAction(runId: string) {
