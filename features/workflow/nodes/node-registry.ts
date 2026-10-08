@@ -3,13 +3,17 @@ import { Globe, MousePointerClick, type LucideIcon } from "lucide-react"
 
 export type StepNodeKind = "trigger" | "action"
 
-// One editable field on a node, rendered as an input in the inspector later.
 export type NodeField = {
     key: string
     label: string
     placeholder?: string
     multiline?: boolean
     required?: boolean
+}
+
+export type NodeOutput = {
+    path: string
+    label: string
 }
 
 // A node type's manifest entry. Add a node by adding an entry to nodeRegistry.
@@ -20,6 +24,7 @@ export type NodeDefinition = {
     icon: LucideIcon
     accent: string // Tailwind classes for the icon chip color
     fields: NodeField[]
+    outputs?: NodeOutput[]
 }
 
 export const nodeRegistry = {
@@ -30,6 +35,7 @@ export const nodeRegistry = {
         icon: MousePointerClick,
         accent: "bg-blue-500 text-white",
         fields: [],
+        outputs:[]
     },
     "open-url": {
         type: "open-url",
@@ -38,8 +44,12 @@ export const nodeRegistry = {
         icon: Globe,
         accent: "bg-emerald-500 text-white",
         fields: [
-            { key: "url", label: "URL", placeholder: "https://youtube.com", required:true },
-        ] 
+            { key: "url", label: "URL", placeholder: "https://youtube.com", required: true },
+        ],
+        outputs: [
+            { path: "url", label: "URL" },
+            { path: "title", label: "Title" },
+        ],
     },
 } satisfies Record<string, NodeDefinition>
 
