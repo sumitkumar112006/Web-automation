@@ -71,7 +71,7 @@ export const runWorkflowTask = task({
 
         const modelConfig = groqApiKey
           ? {
-              modelName: "groq/llama-3.3-70b-versatile" as const,
+              modelName: "groq/openai/gpt-oss-120b" as const,
               apiKey: groqApiKey,
             }
           : openaiApiKey
