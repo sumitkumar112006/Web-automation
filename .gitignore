@@ -42,3 +42,5 @@ workflow-shall.md
 .commandcode
 .continue
 .agents
+# Sentry Config File
+.env.sentry-build-plugin
