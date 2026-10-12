@@ -6,6 +6,7 @@ import Hls from "hls.js"
 import { AlertCircle, Loader2, RotateCcw } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import * as Sentry from "@sentry/nextjs"
 import { cn } from "@/lib/utils"
 
 export interface SessionReplayProps {
@@ -119,6 +120,13 @@ export function SessionReplay({
 
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
+          Sentry.addBreadcrumb({
+            category: "session-replay",
+            message: "Fatal HLS player error encountered",
+            data: { errorType: data.type, details: data.details, sessionId },
+            level: "warning",
+          })
+
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
               hls.startLoad()
@@ -128,6 +136,10 @@ export function SessionReplay({
               break
             default:
               hls.destroy()
+              Sentry.captureMessage("Failed to play session recording due to unrecoverable HLS error", {
+                level: "warning",
+                extra: { sessionId, errorType: data.type, details: data.details },
+              })
               setError("Failed to play session recording.")
               break
           }

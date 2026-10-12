@@ -34,6 +34,7 @@ import {
   type StepNodeKind,
   type StepNodeType,
 } from "@/features/workflow/nodes/node-registry"
+import * as Sentry from "@sentry/nextjs"
 import { useProPlan, useUpstreamConnections } from "@/features/workflow/hooks"
 import { deleteWorkflowAction, runWorkflowAction } from "@/features/workflow/actions"
 import { validateGraph } from "../lib/validate-graph"
@@ -367,6 +368,12 @@ function ActionsMenu({ workflowId }: { workflowId: string }) {
     try {
       const res = await deleteWorkflowAction(workflowId)
       if (res?.success) {
+        Sentry.addBreadcrumb({
+          category: "workflow",
+          message: "Workflow deleted by user",
+          data: { workflowId },
+          level: "info",
+        })
         toast.success("Workflow deleted successfully", { id: toastId })
         setOpen(false)
         router.push("/")
@@ -375,6 +382,10 @@ function ActionsMenu({ workflowId }: { workflowId: string }) {
         throw new Error("Failed to delete workflow")
       }
     } catch (err) {
+      Sentry.captureException(err, {
+        tags: { action: "deleteWorkflow" },
+        extra: { workflowId },
+      })
       toast.error(err instanceof Error ? err.message : "Failed to delete workflow", {
         id: toastId,
       })
@@ -434,6 +445,12 @@ function RunButton({ workflowId }: { workflowId: string }) {
         const graph = { nodes: getNodes(), edges: getEdges() }
         const problems = validateGraph(graph)
         if (problems.length > 0) {
+          Sentry.addBreadcrumb({
+            category: "workflow.validation",
+            message: "Validation prevented run",
+            data: { workflowId, problems },
+            level: "warning",
+          })
           toast.error(problems[0])
           return
         }
@@ -444,8 +461,18 @@ function RunButton({ workflowId }: { workflowId: string }) {
               id: workflowId,
               graph,
             })
+            Sentry.addBreadcrumb({
+              category: "workflow.run",
+              message: "Workflow run initiated",
+              data: { workflowId },
+              level: "info",
+            })
             toast.success("Workflow run started")
           } catch (err) {
+            Sentry.captureException(err, {
+              tags: { action: "runWorkflow" },
+              extra: { workflowId },
+            })
             toast.error(err instanceof Error ? err.message : "Failed to run workflow")
           }
         })
