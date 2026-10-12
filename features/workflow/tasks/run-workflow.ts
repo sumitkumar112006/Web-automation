@@ -19,6 +19,7 @@ export type RunStep = {
   completedAt?: number
   durationMs?: number
   duration?: number
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   output?: any
   error?: string
 }
@@ -69,6 +70,7 @@ export const runWorkflowTask = task({
     // separate provider key is needed.
     let stagehand: Stagehand | undefined
     let browser: Awaited<ReturnType<typeof browserbase.launch>> | undefined
+    let sessionId: string | undefined
 
     const getStagehand = async () => {
       if (!stagehand) {
@@ -103,6 +105,7 @@ export const runWorkflowTask = task({
         }
 
         browser = await browserbase.launch({ apiKey })
+        sessionId = browser.sessionId
         stagehand = await Stagehand.create({
           browser,
           model: modelConfig,
@@ -186,6 +189,6 @@ export const runWorkflowTask = task({
       await browser?.close()
     }
 
-    return { steps }
+    return { steps, sessionId }
   },
 })

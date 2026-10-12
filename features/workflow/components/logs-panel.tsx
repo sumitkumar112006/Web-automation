@@ -7,6 +7,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
+  Film,
   Loader2,
   Terminal,
 } from "lucide-react"
@@ -17,13 +18,16 @@ import {
   useWorkflowRunsSafe,
   type WorkflowRun,
   type RunStep,
+  type ConsoleSelection,
 } from "./workflow-runs-provider"
 import type { NodeType } from "@/features/workflow/nodes/node-registry"
 
 export interface LogsPanelProps {
   runs?: WorkflowRun[]
+  selection?: ConsoleSelection | null
   selectedStepId?: string | null
-  onSelectStep?: (stepId: string) => void
+  onSelectStep?: (stepId: string, runId?: string) => void
+  onSelectReplay?: (runId: string, sessionId: string) => void
   className?: string
 }
 
@@ -185,25 +189,132 @@ function StepRow({
   )
 }
 
+function ReplayRow({
+  run,
+  isSelected,
+  onSelect,
+}: {
+  run: WorkflowRun
+  isSelected: boolean
+  onSelect: () => void
+}) {
+  const runDuration =
+    run.durationMs ??
+    (run.finishedAt && run.startedAt
+      ? new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime()
+      : undefined)
+  const formattedDuration = formatDuration(runDuration)
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      data-selected={isSelected ? "true" : "false"}
+      data-replay-run-id={run.id}
+      data-session-id={run.sessionId}
+      aria-pressed={isSelected}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault()
+          onSelect()
+        }
+      }}
+      className={cn(
+        "group flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-xs transition-colors cursor-pointer select-none",
+        // Default border & background
+        "border-border/40 bg-card/60 hover:bg-muted/70",
+        // Selected: clicking replay selects it
+        isSelected && "ring-2 ring-primary ring-offset-1 bg-accent text-accent-foreground font-medium shadow-xs"
+      )}
+    >
+      <div className="flex min-w-0 flex-1 items-center gap-2.5">
+        <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-purple-600 text-white shadow-xs">
+          <Film className="size-3.5" />
+        </span>
+        <div className="flex min-w-0 flex-col">
+          <div className="flex items-center gap-2">
+            <span className="truncate font-medium">Replay</span>
+          </div>
+          <span className="truncate text-[10px] text-muted-foreground">
+            Browser session recording
+          </span>
+        </div>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-2">
+        {formattedDuration && (
+          <span className="font-mono text-[11px] text-muted-foreground">
+            {formattedDuration}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function LogsPanel({
   runs: propRuns,
+  selection: propSelection,
   selectedStepId: propSelectedStepId,
   onSelectStep,
+  onSelectReplay,
   className,
 }: LogsPanelProps) {
   const context = useWorkflowRunsSafe()
   const runs = propRuns ?? context?.runs ?? []
 
   // Internal selection fallback if used standalone without ConsolePanel
-  const [internalSelectedStepId, setInternalSelectedStepId] = useState<string | null>(null)
-  const isControlled = propSelectedStepId !== undefined
-  const selectedStepId = isControlled ? propSelectedStepId : internalSelectedStepId
+  const [internalSelection, setInternalSelection] = useState<ConsoleSelection | null>(null)
+  const hasControlledSelection = propSelection !== undefined
+  const activeSelection: ConsoleSelection | null = hasControlledSelection
+    ? propSelection
+    : propSelectedStepId !== undefined
+    ? propSelectedStepId
+      ? { type: "step", runId: "", stepId: propSelectedStepId, nodeId: propSelectedStepId }
+      : null
+    : internalSelection
 
-  const handleStepClick = (stepId: string) => {
+  const isStepSelected = (runId: string, stepId: string) => {
+    if (activeSelection?.type === "step") {
+      if (activeSelection.runId) {
+        return (
+          activeSelection.runId === runId &&
+          (activeSelection.stepId === stepId || activeSelection.nodeId === stepId)
+        )
+      }
+      return activeSelection.stepId === stepId || activeSelection.nodeId === stepId
+    }
+    return propSelectedStepId === stepId
+  }
+
+  const isReplaySelected = (runId: string) => {
+    return activeSelection?.type === "replay" && activeSelection.runId === runId
+  }
+
+  const handleStepClick = (stepId: string, runId: string) => {
     if (onSelectStep) {
-      onSelectStep(stepId)
+      onSelectStep(stepId, runId)
     } else {
-      setInternalSelectedStepId((prev) => (prev === stepId ? null : stepId))
+      setInternalSelection((prev) =>
+        prev?.type === "step" &&
+        prev.runId === runId &&
+        (prev.stepId === stepId || prev.nodeId === stepId)
+          ? null
+          : { type: "step", runId, stepId, nodeId: stepId }
+      )
+    }
+  }
+
+  const handleReplayClick = (runId: string, sessionId: string) => {
+    if (onSelectReplay) {
+      onSelectReplay(runId, sessionId)
+    } else {
+      setInternalSelection((prev) =>
+        prev?.type === "replay" && prev.runId === runId
+          ? null
+          : { type: "replay", runId, sessionId }
+      )
     }
   }
 
@@ -238,6 +349,7 @@ export function LogsPanel({
             : undefined)
         const formattedRunDuration = formatDuration(runDuration)
         const runNumber = runs.length - index
+        const hasRecording = Boolean(run.sessionId) && !run.isLive
 
         return (
           <div key={run.id} className="flex flex-col gap-2 p-3">
@@ -266,24 +378,34 @@ export function LogsPanel({
               </div>
             </div>
 
-            {/* Below it, its steps */}
+            {/* Below it, its steps and replay */}
             <div className="flex flex-col gap-1.5 pl-2">
-              {run.steps.length === 0 ? (
+              {run.steps.length === 0 && !hasRecording ? (
                 <div className="px-2 py-1.5 text-[11px] italic text-muted-foreground">
                   No steps registered
                 </div>
               ) : (
-                run.steps.map((step) => {
-                  const isSelected = selectedStepId === step.id
-                  return (
-                    <StepRow
-                      key={step.id}
-                      step={step}
-                      isSelected={isSelected}
-                      onSelect={() => handleStepClick(step.id)}
+                <>
+                  {run.steps.map((step) => {
+                    const isSelected = isStepSelected(run.id, step.id)
+                    return (
+                      <StepRow
+                        key={step.id}
+                        step={step}
+                        isSelected={isSelected}
+                        onSelect={() => handleStepClick(step.id, run.id)}
+                      />
+                    )
+                  })}
+
+                  {hasRecording && (
+                    <ReplayRow
+                      run={run}
+                      isSelected={isReplaySelected(run.id)}
+                      onSelect={() => handleReplayClick(run.id, run.sessionId!)}
                     />
-                  )
-                })
+                  )}
+                </>
               )}
             </div>
           </div>

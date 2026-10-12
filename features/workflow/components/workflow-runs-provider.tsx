@@ -7,6 +7,10 @@ import type { runWorkflowTask, RunStep } from "@/features/workflow/tasks/run-wor
 
 export type { RunStep }
 
+export type ConsoleSelection =
+  | { type: "step"; runId: string; stepId: string; nodeId?: string }
+  | { type: "replay"; runId: string; sessionId: string }
+
 export type RawRealtimeRun = ReturnType<
   typeof useRealtimeRunsWithTag<typeof runWorkflowTask>
 >["runs"][number]
@@ -14,6 +18,7 @@ export type RawRealtimeRun = ReturnType<
 export type WorkflowRun = RawRealtimeRun & {
   steps: RunStep[]
   isLive: boolean
+  sessionId?: string
 }
 
 export function isRunLive(status?: string): boolean {
@@ -36,9 +41,16 @@ export function getRunSteps(
   return outputSteps ?? metadataSteps ?? []
 }
 
+export function getRunSessionId(
+  run?: { output?: unknown } | null
+): string | undefined {
+  if (!run) return undefined
+  return (run.output as { sessionId?: string } | undefined)?.sessionId
+}
+
 export interface WorkflowRunsContextValue {
   /**
-   * All runs for this workflow sorted newest-first, each enriched with resolved `steps` and `isLive`.
+   * All runs for this workflow sorted newest-first, each enriched with resolved `steps`, `isLive`, and `sessionId`.
    */
   runs: WorkflowRun[]
   /**
@@ -59,9 +71,17 @@ export interface WorkflowRunsContextValue {
    */
   isLive: boolean
   /**
+   * The session id for the latest run, if present in its final output.
+   */
+  sessionId?: string
+  /**
    * Utility helper to extract steps from any run payload or metadata.
    */
   getRunSteps: (run?: { output?: unknown; metadata?: unknown } | null) => RunStep[]
+  /**
+   * Utility helper to extract sessionId from a run's final output.
+   */
+  getRunSessionId: (run?: { output?: unknown } | null) => string | undefined
 }
 
 export const WorkflowRunsContext = createContext<WorkflowRunsContextValue | null>(null)
@@ -98,18 +118,18 @@ export function WorkflowRunsProvider({
       .map((run) => {
         const steps = getRunSteps(run)
         const isLive = isRunLive(run.status)
+        const sessionId = getRunSessionId(run)
 
         return {
           ...run,
           steps,
           isLive,
+          sessionId,
         }
       })
   }, [rawRuns])
 
   const latestRun = runs[0]
-  const steps = latestRun?.steps ?? []
-  const isLive = latestRun?.isLive ?? false
 
   const value = useMemo(
     () => ({
@@ -117,11 +137,13 @@ export function WorkflowRunsProvider({
       rawRuns: rawRuns ?? [],
       error,
       latestRun,
-      steps,
-      isLive,
+      steps: latestRun?.steps ?? [],
+      isLive: latestRun?.isLive ?? false,
+      sessionId: latestRun?.sessionId,
       getRunSteps,
+      getRunSessionId,
     }),
-    [runs, rawRuns, error, latestRun, steps, isLive]
+    [runs, rawRuns, error, latestRun]
   )
 
   return (
@@ -167,6 +189,7 @@ export function useWorkflowRun(runId?: string): WorkflowRun | undefined {
 export function useLatestRunSteps(): {
   steps: RunStep[]
   isLive: boolean
+  sessionId?: string
   latestRun: WorkflowRun | undefined
   error: Error | undefined
 } {
@@ -179,6 +202,7 @@ export function useLatestRunSteps(): {
   return {
     steps: context.steps,
     isLive: context.isLive,
+    sessionId: context.sessionId,
     latestRun: context.latestRun,
     error: context.error,
   }
