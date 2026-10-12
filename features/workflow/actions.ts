@@ -1,7 +1,7 @@
 "use server"
 
 import { auth } from "@clerk/nextjs/server"
-import { auth as triggerAuth, tasks, runs } from "@trigger.dev/sdk"
+import { tasks, runs } from "@trigger.dev/sdk"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
@@ -54,12 +54,25 @@ export async function runWorkflowAction({
   id: string
   graph: WorkflowGraph
 }) {
-  const { orgId } = await auth()
+  const { orgId, has } = await auth()
 
   if (!orgId) {
     throw new Error("No active organization")
   }
-  await saveWorkflowGraph({orgId,id,graph})
+
+  // Stop workflows containing an Agent node from running unless the org is on the Pro plan
+  const hasAgentNode = graph?.nodes?.some(
+    (node) => node.data?.type === "agent" || (node as { type?: string }).type === "agent"
+  )
+
+  if (hasAgentNode) {
+    const isPro = has({ plan: "pro" }) || has({ plan: "org:pro" })
+    if (!isPro) {
+      throw new Error("The Agent node requires a Pro plan subscription")
+    }
+  }
+
+  await saveWorkflowGraph({ orgId, id, graph })
 
   const handle = await tasks.trigger<typeof runWorkflowTask>(
     "run-workflow",

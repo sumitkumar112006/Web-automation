@@ -59,6 +59,12 @@ export function SessionReplay({
           return
         }
 
+        if (res.status === 403) {
+          setError("Pro plan required to view session recordings.")
+          setStatus("error")
+          return
+        }
+
         // Replay not ready yet (Browserbase status e.g. 404 / 422) - poll again in 2.5s
         timeoutId = setTimeout(checkReplayStatus, 2500)
       } catch {

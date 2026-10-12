@@ -2,6 +2,9 @@ import * as React from "react"
 import { OrganizationSwitcher, UserButton } from "@clerk/nextjs"
 import { auth } from "@clerk/nextjs/server"
 
+import Link from "next/link"
+import { Sparkles } from "lucide-react"
+
 import {
   Sidebar,
   SidebarFooter,
@@ -41,8 +44,15 @@ export async function AppSidebar({ ...props }: React.ComponentProps<typeof Sideb
       <WorkflowNav workflows={workflows} />
 
       <SidebarFooter className="p-3">
-        <div className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
+        <div className="flex items-center justify-between gap-2 group-data-[collapsible=icon]:justify-center">
           <UserButton />
+          <Link
+            href="/pricing"
+            className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors group-data-[collapsible=icon]:hidden"
+          >
+            <Sparkles className="size-3.5 text-primary" />
+            <span>Plans</span>
+          </Link>
         </div>
       </SidebarFooter>
       <SidebarRail />

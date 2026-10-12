@@ -6,9 +6,15 @@ interface RouteProps {
 }
 
 export async function GET(request: Request, { params }: RouteProps) {
-  const { orgId } = await auth()
+  const { orgId, has } = await auth()
   if (!orgId) {
     return new Response("Unauthorized", { status: 401 })
+  }
+
+  // Session replay is premium: only orgs on the pro plan can access recordings
+  const isPro = has({ plan: "pro" }) || has({ plan: "org:pro" })
+  if (!isPro) {
+    return new Response("Pro plan required to access session recordings", { status: 403 })
   }
 
   const { sessionId } = await params

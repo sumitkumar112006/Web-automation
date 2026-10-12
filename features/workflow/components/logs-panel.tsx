@@ -9,10 +9,12 @@ import {
   Clock,
   Film,
   Loader2,
+  Lock,
   Terminal,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { useProPlan } from "@/features/workflow/hooks"
 import { NodeIcon } from "./right-sidebar"
 import {
   useWorkflowRunsSafe,
@@ -198,6 +200,8 @@ function ReplayRow({
   isSelected: boolean
   onSelect: () => void
 }) {
+  const { isPro, redirectToPricing } = useProPlan()
+
   const runDuration =
     run.durationMs ??
     (run.finishedAt && run.startedAt
@@ -205,25 +209,36 @@ function ReplayRow({
       : undefined)
   const formattedDuration = formatDuration(runDuration)
 
+  const handleClick = () => {
+    if (!isPro) {
+      redirectToPricing()
+      return
+    }
+    onSelect()
+  }
+
   return (
     <div
       role="button"
       tabIndex={0}
       data-selected={isSelected ? "true" : "false"}
+      data-locked={!isPro ? "true" : undefined}
       data-replay-run-id={run.id}
       data-session-id={run.sessionId}
       aria-pressed={isSelected}
-      onClick={onSelect}
+      onClick={handleClick}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault()
-          onSelect()
+          handleClick()
         }
       }}
+      title={!isPro ? "Upgrade to Pro to watch session replay" : undefined}
       className={cn(
         "group flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-xs transition-colors cursor-pointer select-none",
         // Default border & background
         "border-border/40 bg-card/60 hover:bg-muted/70",
+        !isPro && "opacity-85 hover:opacity-100",
         // Selected: clicking replay selects it
         isSelected && "ring-2 ring-primary ring-offset-1 bg-accent text-accent-foreground font-medium shadow-xs"
       )}
@@ -233,21 +248,31 @@ function ReplayRow({
           <Film className="size-3.5" />
         </span>
         <div className="flex min-w-0 flex-col">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <span className="truncate font-medium">Replay</span>
+            {!isPro && (
+              <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                <Lock className="size-2.5" />
+                <span>Pro</span>
+              </span>
+            )}
           </div>
           <span className="truncate text-[10px] text-muted-foreground">
-            Browser session recording
+            {!isPro ? "Upgrade to Pro to watch recording" : "Browser session recording"}
           </span>
         </div>
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
-        {formattedDuration && (
+        {!isPro ? (
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-primary">
+            <span>Upgrade</span>
+          </span>
+        ) : formattedDuration ? (
           <span className="font-mono text-[11px] text-muted-foreground">
             {formattedDuration}
           </span>
-        )}
+        ) : null}
       </div>
     </div>
   )

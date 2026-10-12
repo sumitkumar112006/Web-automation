@@ -4,7 +4,7 @@ import * as React from "react"
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { useReactFlow, useStore } from "@xyflow/react"
-import { Loader2, MoreHorizontal, Play, Trash2 } from "lucide-react"
+import { Loader2, Lock, MoreHorizontal, Play, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -34,7 +34,7 @@ import {
   type StepNodeKind,
   type StepNodeType,
 } from "@/features/workflow/nodes/node-registry"
-import { useUpstreamConnections } from "@/features/workflow/hooks"
+import { useProPlan, useUpstreamConnections } from "@/features/workflow/hooks"
 import { deleteWorkflowAction, runWorkflowAction } from "@/features/workflow/actions"
 import { validateGraph } from "../lib/validate-graph"
 
@@ -230,8 +230,14 @@ const definitions: NodeDefinition[] = Object.values(nodeRegistry)
 // The Toolbar tab: a button per node type that adds it to the canvas.
 function Palette() {
   const { screenToFlowPosition, setNodes, getNodes } = useReactFlow()
+  const { isPro, redirectToPricing } = useProPlan()
 
   const add = (type: NodeType) => {
+    if (type === "agent" && !isPro) {
+      redirectToPricing()
+      return
+    }
+
     const def = nodeRegistry[type]
     const currentNodes = getNodes() as StepNodeType[]
 
@@ -300,17 +306,42 @@ function Palette() {
             <AccordionContent className="flex flex-col gap-0.5">
               {definitions
                 .filter((def) => def.kind === section.kind)
-                .map((def) => (
-                  <Button
-                    key={def.type}
-                    variant="ghost"
-                    onClick={() => add(def.type as NodeType)}
-                    className="justify-start gap-2.5 px-1.5 text-xs"
-                  >
-                    <NodeIcon type={def.type as NodeType} />
-                    {def.label}
-                  </Button>
-                ))}
+                .map((def) => {
+                  const isLocked = def.type === "agent" && !isPro
+
+                  return (
+                    <Button
+                      key={def.type}
+                      variant="ghost"
+                      onClick={() => {
+                        if (isLocked) {
+                          redirectToPricing()
+                          return
+                        }
+                        add(def.type as NodeType)
+                      }}
+                      className={cn(
+                        "w-full justify-start gap-2.5 px-1.5 text-xs",
+                        isLocked && "opacity-75 hover:opacity-100"
+                      )}
+                      title={
+                        isLocked
+                          ? "Upgrade to Pro to use the Agent node"
+                          : undefined
+                      }
+                      data-locked={isLocked ? "true" : undefined}
+                    >
+                      <NodeIcon type={def.type as NodeType} />
+                      <span className="truncate">{def.label}</span>
+                      {isLocked && (
+                        <span className="ml-auto inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                          <Lock className="size-3" />
+                          <span>Pro</span>
+                        </span>
+                      )}
+                    </Button>
+                  )
+                })}
             </AccordionContent>
           </AccordionItem>
         ))}
