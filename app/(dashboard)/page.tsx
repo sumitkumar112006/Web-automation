@@ -1,4 +1,7 @@
-import { Plus, Workflow } from "lucide-react"
+"use client"
+
+import { useTransition } from "react"
+import { Loader2, Plus, Workflow } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -9,8 +12,19 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty"
+import { createWorkflowAction } from "@/features/workflow/actions"
+import { generateSlug } from "@/features/workflow/lib"
 
 export default function Page() {
+  const [isPending, startTransition] = useTransition()
+
+  const handleCreate = () => {
+    startTransition(async () => {
+      const slug = generateSlug()
+      await createWorkflowAction(slug)
+    })
+  }
+
   return (
     <Empty className="flex-1 min-h-[calc(100svh-3rem)] md:min-h-svh p-4 sm:p-6 md:p-8">
       <EmptyHeader className="max-w-xs sm:max-w-sm px-2">
@@ -25,8 +39,17 @@ export default function Page() {
         </EmptyDescription>
       </EmptyHeader>
       <EmptyContent className="mt-1">
-        <Button size="default" className="h-9 px-4 text-sm font-medium">
-          <Plus className="size-4 mr-1.5" />
+        <Button
+          size="default"
+          className="h-9 px-4 text-sm font-medium"
+          onClick={handleCreate}
+          disabled={isPending}
+        >
+          {isPending ? (
+            <Loader2 className="size-4 mr-1.5 animate-spin" />
+          ) : (
+            <Plus className="size-4 mr-1.5" />
+          )}
           New workflow
         </Button>
       </EmptyContent>

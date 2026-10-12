@@ -4,7 +4,7 @@ import * as React from "react"
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { useReactFlow, useStore } from "@xyflow/react"
-import { Loader2, Lock, MoreHorizontal, Play, Trash2 } from "lucide-react"
+import { Loader2, Lock, MoreHorizontal, Play, Square, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 import {
@@ -36,7 +36,12 @@ import {
 } from "@/features/workflow/nodes/node-registry"
 import * as Sentry from "@sentry/nextjs"
 import { useProPlan, useUpstreamConnections } from "@/features/workflow/hooks"
-import { deleteWorkflowAction, runWorkflowAction } from "@/features/workflow/actions"
+import {
+  cancelWorkflowRunAction,
+  deleteWorkflowAction,
+  runWorkflowAction,
+} from "@/features/workflow/actions"
+import { useWorkflowRunsSafe } from "./workflow-runs-provider"
 import { validateGraph } from "../lib/validate-graph"
 
 // This file builds up to the RightSidebar component exported at the bottom: a
@@ -431,52 +436,100 @@ function ActionsMenu({ workflowId }: { workflowId: string }) {
   )
 }
 
-// Kicks off a run of the current workflow.
+// Kicks off or stops a run of the current workflow.
 function RunButton({ workflowId }: { workflowId: string }) {
   const { getNodes, getEdges } = useReactFlow<StepNodeType>()
   const [isPending, startTransition] = useTransition()
+  const runsContext = useWorkflowRunsSafe()
+
+  const liveRun =
+    runsContext?.runs.find((r) => r.isLive) ??
+    (runsContext?.isLive ? runsContext?.latestRun : undefined)
+  const isRunning = Boolean(liveRun)
+
+  const handleRun = () => {
+    const graph = { nodes: getNodes(), edges: getEdges() }
+    const problems = validateGraph(graph)
+    if (problems.length > 0) {
+      Sentry.addBreadcrumb({
+        category: "workflow.validation",
+        message: "Validation prevented run",
+        data: { workflowId, problems },
+        level: "warning",
+      })
+      toast.error(problems[0])
+      return
+    }
+
+    startTransition(async () => {
+      try {
+        await runWorkflowAction({
+          id: workflowId,
+          graph,
+        })
+        Sentry.addBreadcrumb({
+          category: "workflow.run",
+          message: "Workflow run initiated",
+          data: { workflowId },
+          level: "info",
+        })
+        toast.success("Workflow run started")
+      } catch (err) {
+        Sentry.captureException(err, {
+          tags: { action: "runWorkflow" },
+          extra: { workflowId },
+        })
+        toast.error(err instanceof Error ? err.message : "Failed to run workflow")
+      }
+    })
+  }
+
+  const handleStop = () => {
+    if (!liveRun) return
+    startTransition(async () => {
+      try {
+        await cancelWorkflowRunAction(liveRun.id)
+        Sentry.addBreadcrumb({
+          category: "workflow.run",
+          message: "Workflow run cancelled by user",
+          data: { workflowId, runId: liveRun.id },
+          level: "info",
+        })
+        toast.success("Workflow run stopped")
+      } catch (err) {
+        Sentry.captureException(err, {
+          tags: { action: "cancelWorkflowRun" },
+          extra: { workflowId, runId: liveRun.id },
+        })
+        toast.error(err instanceof Error ? err.message : "Failed to stop workflow run")
+      }
+    })
+  }
+
+  if (isRunning) {
+    return (
+      <Button
+        size="sm"
+        variant="destructive"
+        disabled={isPending}
+        onClick={handleStop}
+      >
+        {isPending ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : (
+          <Square className="size-3.5 fill-current" />
+        )}
+        Stop
+      </Button>
+    )
+  }
 
   return (
     <Button
       size="sm"
       variant="secondary"
       disabled={isPending}
-      onClick={() => {
-        const graph = { nodes: getNodes(), edges: getEdges() }
-        const problems = validateGraph(graph)
-        if (problems.length > 0) {
-          Sentry.addBreadcrumb({
-            category: "workflow.validation",
-            message: "Validation prevented run",
-            data: { workflowId, problems },
-            level: "warning",
-          })
-          toast.error(problems[0])
-          return
-        }
-
-        startTransition(async () => {
-          try {
-            await runWorkflowAction({
-              id: workflowId,
-              graph,
-            })
-            Sentry.addBreadcrumb({
-              category: "workflow.run",
-              message: "Workflow run initiated",
-              data: { workflowId },
-              level: "info",
-            })
-            toast.success("Workflow run started")
-          } catch (err) {
-            Sentry.captureException(err, {
-              tags: { action: "runWorkflow" },
-              extra: { workflowId },
-            })
-            toast.error(err instanceof Error ? err.message : "Failed to run workflow")
-          }
-        })
-      }}
+      onClick={handleRun}
     >
       {isPending ? (
         <Loader2 className="size-3.5 animate-spin" />

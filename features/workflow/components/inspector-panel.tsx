@@ -60,7 +60,7 @@ export function InspectorPanel({
     (selection?.type === "replay" ? selection.sessionId : undefined) ??
     run?.sessionId
 
-  const isRunning = step?.status === "running"
+  const isRunning = (run ? run.isLive : true) && step?.status === "running"
   const isFailed = step?.status === "failed"
   const isInactive = step?.status === "pending" || !step?.status
   const isDone = step?.status === "done"

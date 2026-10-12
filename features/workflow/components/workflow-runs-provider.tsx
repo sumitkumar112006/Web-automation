@@ -33,12 +33,31 @@ export function isRunLive(status?: string): boolean {
 }
 
 export function getRunSteps(
-  run?: { output?: unknown; metadata?: unknown } | null
+  run?: { output?: unknown; metadata?: unknown; status?: string } | null
 ): RunStep[] {
   if (!run) return []
   const outputSteps = (run.output as { steps?: RunStep[] } | undefined)?.steps
   const metadataSteps = (run.metadata as { steps?: RunStep[] } | undefined)?.steps
-  return outputSteps ?? metadataSteps ?? []
+  const steps = outputSteps ?? metadataSteps ?? []
+
+  // If the run has terminated (e.g. CANCELED, FAILED) but was stopped while a step
+  // was in flight, metadata was frozen with status "running". Normalize it so it doesn't
+  // show as running.
+  if (run.status && !isRunLive(run.status)) {
+    return steps.map((step) => {
+      if (step.status === "running") {
+        const isCanceled = run.status === "CANCELED"
+        return {
+          ...step,
+          status: "failed",
+          error: step.error ?? (isCanceled ? "Run canceled" : "Run stopped"),
+        }
+      }
+      return step
+    })
+  }
+
+  return steps
 }
 
 export function getRunSessionId(

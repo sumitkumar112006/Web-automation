@@ -10,6 +10,7 @@ import {
   Film,
   Loader2,
   Lock,
+  Square,
   Terminal,
 } from "lucide-react"
 
@@ -63,6 +64,15 @@ function RunStatusBadge({
     )
   }
 
+  if (status === "CANCELED" || status === "INTERRUPTED") {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+        <Square className="size-2.5 fill-current" />
+        Canceled
+      </span>
+    )
+  }
+
   if (status === "FAILED" || status === "CRASHED" || status === "SYSTEM_FAILURE") {
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-destructive/10 px-2 py-0.5 text-[11px] font-medium text-destructive">
@@ -90,14 +100,16 @@ function RunStatusBadge({
 
 function StepRow({
   step,
+  isRunLive,
   isSelected,
   onSelect,
 }: {
   step: RunStep
+  isRunLive?: boolean
   isSelected: boolean
   onSelect: () => void
 }) {
-  const isRunning = step.status === "running"
+  const isRunning = Boolean(isRunLive) && step.status === "running"
   const isFailed = step.status === "failed"
   const isInactive = step.status === "pending" || !step.status
 
@@ -417,6 +429,7 @@ export function LogsPanel({
                       <StepRow
                         key={step.id}
                         step={step}
+                        isRunLive={run.isLive}
                         isSelected={isSelected}
                         onSelect={() => handleStepClick(step.id, run.id)}
                       />
