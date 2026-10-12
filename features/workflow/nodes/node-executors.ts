@@ -8,6 +8,7 @@ import { openUrl } from "./open-url";
 import { act } from "./act";
 import { extract } from "./extract";
 import { observe } from "./observe";
+import { agent } from "./agent";
 
 export type NodeContext = {
   values: Record<string, string>;
@@ -25,4 +26,6 @@ export const nodeExecutors: Partial<Record<NodeType, NodeExecutor>> = {
     extract({ stagehand: await getStagehand(), instruction: values.instruction }),
   observe: async ({ values, getStagehand }) =>
     observe({ stagehand: await getStagehand(), instruction: values.instruction }),
+  agent: async ({ values, getStagehand }) =>
+    agent({ stagehand: await getStagehand(), instruction: values.instruction }),
 } satisfies Record<ActionNodeType, NodeExecutor>;
