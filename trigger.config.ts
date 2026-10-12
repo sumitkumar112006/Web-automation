@@ -1,5 +1,7 @@
 import { defineConfig } from "@trigger.dev/sdk"
 import { additionalFiles } from "@trigger.dev/build/extensions/core"
+import { esbuildPlugin } from "@trigger.dev/build/extensions"
+import { sentryEsbuildPlugin } from "@sentry/esbuild-plugin"
 
 export default defineConfig({
   project: "proj_bdyeeuxdresnszikvadu",
@@ -16,7 +18,7 @@ export default defineConfig({
       randomize: true,
     },
   },
-  dirs: ["features/workflow/tasks"],
+  dirs: ["features/workflow/tasks", "trigger"],
   build: {
     extensions: [
       additionalFiles({
@@ -26,6 +28,14 @@ export default defineConfig({
           "node_modules/@browserbasehq/stagehand/dist/extension/**",
         ],
       }),
+      esbuildPlugin(
+        sentryEsbuildPlugin({
+          org: process.env.SENTRY_ORG ?? "browser-automation-5a",
+          project: process.env.SENTRY_PROJECT ?? "browser-automation",
+          authToken: process.env.SENTRY_AUTH_TOKEN,
+        }),
+        { placement: "last", target: "deploy" }
+      ),
     ],
   },
 })

@@ -63,6 +63,8 @@
     "vaul": "^1.1.2"
   },
   "devDependencies": {
+    "@sentry/esbuild-plugin": "^5.4.1",
+    "@sentry/node": "^11.7.0",
     "@tailwindcss/postcss": "^4",
     "@trigger.dev/build": "4.7.3",
     "@types/node": "^20",
