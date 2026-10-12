@@ -48,18 +48,30 @@ import { validateGraph } from "../lib/validate-graph"
 // ---------------------------------------------------------------------------
 
 // The accent-colored icon chip, mirroring the node on the canvas.
-function NodeIcon({ type, className }: { type: NodeType; className?: string }) {
-  const def = nodeRegistry[type]
+export function NodeIcon({
+  type,
+  className,
+  isLoading,
+}: {
+  type: NodeType
+  className?: string
+  isLoading?: boolean
+}) {
+  const def = nodeRegistry[type] ?? nodeRegistry.start
   const Icon = def.icon
   return (
     <span
       className={cn(
         "flex size-6 shrink-0 items-center justify-center rounded-md",
-        def.accent,
+        isLoading ? "bg-blue-500 text-white" : def.accent,
         className
       )}
     >
-      <Icon className="size-3.5" />
+      {isLoading ? (
+        <Loader2 className="size-3.5 animate-spin" />
+      ) : (
+        <Icon className="size-3.5" />
+      )}
     </span>
   )
 }

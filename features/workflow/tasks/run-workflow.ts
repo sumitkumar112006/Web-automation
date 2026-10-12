@@ -7,9 +7,20 @@ import { browserbase, Stagehand } from "@browserbasehq/stagehand"
 import { nodeExecutors } from "@/features/workflow/nodes/node-executors"
 import { interpolate } from "@/features/workflow/lib"
 
+import type { NodeType } from "@/features/workflow/nodes/node-registry"
+
 export type RunStep = {
   id: string
+  nodeType: NodeType
+  type: NodeType
+  title: string
   status: "pending" | "running" | "done" | "failed"
+  startedAt?: number
+  completedAt?: number
+  durationMs?: number
+  duration?: number
+  output?: any
+  error?: string
 }
 
 // Ensure Stagehand finds the extension assets even when bundled by Trigger.dev
@@ -107,7 +118,18 @@ export const runWorkflowTask = task({
     const outputs: Record<string, unknown> = {}
 
     // Initialize and publish initial step list under metadata "steps"
-    const steps: RunStep[] = order.map((id) => ({ id, status: "pending" }))
+    const steps: RunStep[] = order.map((id) => {
+      const node = byId.get(id)
+      const nodeType = (node?.data?.type ?? "start") as NodeType
+      const title = node?.data?.title ?? "Step"
+      return {
+        id,
+        nodeType,
+        type: nodeType,
+        title,
+        status: "pending",
+      }
+    })
     metadata.set("steps", steps)
 
     try {
@@ -115,7 +137,9 @@ export const runWorkflowTask = task({
         const node = byId.get(id)!
         const step = steps.find((s) => s.id === id)!
 
+        const startTime = Date.now()
         step.status = "running"
+        step.startedAt = startTime
         metadata.set("steps", steps)
         await metadata.flush()
 
@@ -136,11 +160,22 @@ export const runWorkflowTask = task({
               getStagehand,
             })
             outputs[id] = result
+            step.output = result
           }
+          const endTime = Date.now()
           step.status = "done"
+          step.completedAt = endTime
+          step.durationMs = endTime - startTime
+          step.duration = step.durationMs
           metadata.set("steps", steps)
+          await metadata.flush()
         } catch (err) {
+          const endTime = Date.now()
           step.status = "failed"
+          step.completedAt = endTime
+          step.durationMs = endTime - startTime
+          step.duration = step.durationMs
+          step.error = err instanceof Error ? err.message : String(err)
           metadata.set("steps", steps)
           await metadata.flush()
           throw err
